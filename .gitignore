@@ -1,0 +1,23 @@
+# --- Python (Arquivos compilados) ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Ambientes Virtuais ---
+# Pastas onde ficam as bibliotecas instaladas
+venv/
+.venv/
+env/
+
+# --- IDEs e Editores (Configurações locais) ---
+.vscode/
+.idea/
+
+# --- Dados do Projeto ---
+# Ignora o arquivo que contém seus dados reais/teste.
+# Você não quer subir seus testes para o GitHub.
+data/estacionamento.json
+
+# --- Sistema Operacional ---
+.DS_Store
+Thumbs.db
