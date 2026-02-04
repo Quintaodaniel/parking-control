@@ -1,4 +1,5 @@
 import json
+import shutil
 import os
 
 class BancoDeDadosJson:
@@ -42,10 +43,10 @@ class BancoDeDadosJson:
             return {"pessoas": [], "veiculos": [], "historico": []}
 
     def salvar(self, dados):
-        """
-        Recebe um dicionário Python e salva no arquivo JSON.
-        """
-        with open(self.arquivo, 'w', encoding='utf-8') as f:
-            # indent=4 deixa o arquivo bonito para ler (formatado)
-            # ensure_ascii=False permite salvar acentos (ex: "João") corretamente
-            json.dump(dados, f, indent=4, ensure_ascii=False)
+            """Salva com backup de segurança."""
+            # Se o arquivo existe, cria uma cópia .bak antes de sobrescrever
+            if os.path.exists(self.arquivo):
+                shutil.copyfile(self.arquivo, self.arquivo + ".bak")
+                
+            with open(self.arquivo, 'w', encoding='utf-8') as f:
+                json.dump(dados, f, indent=4, ensure_ascii=False)

@@ -2,10 +2,26 @@ from app.database.repositorios import RepositorioEstacionamento
 from app.models.pessoa import Pessoa
 from app.models.veiculo import Veiculo
 from app.utils.validadores import ValidadorCPF, ValidadorPlaca
+import csv
 
 class ControleEstacionamento:
     def __init__(self):
         self.repo = RepositorioEstacionamento()
+
+    def exportar_historico_csv(self):
+        """Gera um arquivo CSV com todo o histórico."""
+        historico = self.repo.listar_historico_completo()
+        if not historico:
+            return {"sucesso": False, "mensagem": "Histórico vazio."}
+        
+        try:
+            with open('data/relatorio_acessos.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                escritor = csv.DictWriter(f, fieldnames=["data_hora", "tipo", "placa"])
+                escritor.writeheader()
+                escritor.writerows(historico)
+            return {"sucesso": True, "mensagem": "Arquivo 'data/relatorio_acessos.csv' gerado!"}
+        except Exception as e:
+            return {"sucesso": False, "mensagem": f"Erro ao exportar: {e}"}
 
     def cadastrar_pessoa(self, nome, cpf, contato):
         """Cadastra um novo proprietário."""
@@ -55,61 +71,64 @@ class ControleEstacionamento:
                 return {"sucesso": False, "mensagem": f"Erro de validação: {str(e)}"}
 
     def buscar_acesso(self, termo_busca):
-        """
-        Verifica se o VEÍCULO ou CPF está liberado e retorna os detalhes para a tela.
-        """
-        # CENÁRIO 1: Busca por PLACA (Ideal)
+        from app.utils.validadores import ValidadorPlaca, ValidadorCPF
+        
+        # Se for PLACA
         if ValidadorPlaca.validar(termo_busca):
             veiculo = self.repo.buscar_veiculo_por_placa(termo_busca)
-            
-            if not veiculo:
-                return {"encontrado": False, "mensagem": "Placa não cadastrada."}
-            
+            if not veiculo: return {"encontrado": False, "mensagem": "Placa não cadastrada."}
             dono = self.repo.buscar_pessoa_por_cpf(veiculo.proprietario_cpf)
-            nome_dono = dono.nome if dono else "Desconhecido"
+            return {
+                "encontrado": True, "liberado": veiculo.autorizado,
+                "mensagem": "Veículo Identificado",
+                "detalhes": f"Modelo: {veiculo.modelo} | Dono: {dono.nome if dono else '???'}",
+                "placa_direta": veiculo.placa
+            }
 
-            status_str = "LIBERADO" if veiculo.autorizado else "NEGADO"
+        # Se for CPF
+        elif ValidadorCPF.validar(termo_busca):
+            pessoa = self.repo.buscar_pessoa_por_cpf(termo_busca)
+            if not pessoa: return {"encontrado": False, "mensagem": "CPF não cadastrado."}
+            
+            # Busca todos os carros desse CPF
+            veiculos_do_dono = []
+            dados = self.repo.listar_todos_veiculos()
+            for v in dados:
+                if v['proprietario_cpf'] == pessoa.cpf:
+                    veiculos_do_dono.append(v)
             
             return {
                 "encontrado": True,
-                "liberado": veiculo.autorizado, # Aqui está a correção: Pega o valor real do banco
-                "mensagem": f"Acesso {status_str}",
-                "detalhes": f"Veículo: {veiculo.modelo} ({veiculo.cor}) | Dono: {nome_dono}"
+                "liberado": any(v.get('autorizado') for v in veiculos_do_dono),
+                "mensagem": f"Pessoa: {pessoa.nome}",
+                "detalhes": f"Possui {len(veiculos_do_dono)} veículo(s) cadastrado(s).",
+                "lista_veiculos": veiculos_do_dono # Passa a lista para a tela
             }
+        
+        return {"encontrado": False, "mensagem": "Formato inválido (Use Placa ou CPF)."}
 
-        # CENÁRIO 2: Busca por CPF
-        elif ValidadorCPF.validar(termo_busca):
-            pessoa = self.repo.buscar_pessoa_por_cpf(termo_busca)
-            if not pessoa:
-                return {"encontrado": False, "mensagem": "Pessoa não encontrada."}
+    def relatorio_veiculos_internos(self):
+        """Identifica quais veículos entraram e ainda não saíram."""
+        historico = self.repo.listar_historico_completo()
+        status_atual = {} # Placa: ultimo_movimento
 
-            # Simula busca de carros deste CPF
-            todos_veiculos = self.repo.listar_todos_veiculos()
-            carros_autorizados = []
-            
-            cpf_limpo = pessoa.cpf 
-            # Procura nos dicionários crus do repo
-            for v_dict in todos_veiculos:
-                if v_dict["proprietario_cpf"] == cpf_limpo and v_dict.get("autorizado"):
-                    carros_autorizados.append(f"{v_dict['modelo']} ({v_dict['placa']})")
+        for reg in historico:
+            status_atual[reg['placa']] = reg['tipo']
 
-            if carros_autorizados:
-                return {
-                    "encontrado": True,
-                    "liberado": True,
-                    "mensagem": "Pessoa possui veículos autorizados.",
-                    "detalhes": f"Veículos permitidos: {', '.join(carros_autorizados)}"
-                }
-            else:
-                return {
-                    "encontrado": True,
-                    "liberado": False,
-                    "mensagem": "Pessoa sem veículos autorizados para o evento.",
-                    "detalhes": f"Pessoa: {pessoa.nome} (Sem permissão ativa)"
-                }
-
-        else:
-            return {"encontrado": False, "mensagem": "Formato inválido."}
+        # Filtra apenas os que o último registro foi ENTRADA
+        placas_dentro = [p for p, tipo in status_atual.items() if tipo == 'ENTRADA']
+        
+        resultado = []
+        for placa in placas_dentro:
+            v = self.repo.buscar_veiculo_por_placa(placa)
+            if v:
+                dono = self.repo.buscar_pessoa_por_cpf(v.proprietario_cpf)
+                resultado.append({
+                    "placa": v.placa,
+                    "modelo": v.modelo,
+                    "dono": dono.nome if dono else "Desconhecido"
+                })
+        return resultado
 
     def registrar_fluxo(self, placa, tipo):
         """Registra a entrada/saída no histórico."""

@@ -100,6 +100,17 @@ class RepositorioEstacionamento:
                 return Pessoa.from_dict(p_dict)
         
         return None
+    
+    def buscar_pessoas_por_nome(self, nome_parcial: str):
+        """Busca pessoas que contenham o texto no nome (case insensitive)."""
+        dados = self.db.ler()
+        resultados = []
+        nome_busca = nome_parcial.lower()
+        
+        for p_dict in dados["pessoas"]:
+            if nome_busca in p_dict["nome"].lower():
+                resultados.append(Pessoa.from_dict(p_dict))
+        return resultados
 
     def listar_pessoas(self):
         """Retorna uma lista de objetos Pessoa."""
@@ -123,3 +134,13 @@ class RepositorioEstacionamento:
                 return Veiculo.from_dict(v_dict)
         
         return None
+    
+    def buscar_veiculos_por_cpf(self, cpf: str):
+        """Retorna lista de objetos Veiculo de um CPF."""
+        dados = self.db.ler()
+        cpf_limpo = ValidadorCPF.limpar(cpf)
+        lista = []
+        for v_dict in dados["veiculos"]:
+            if v_dict["proprietario_cpf"] == cpf_limpo:
+                lista.append(Veiculo.from_dict(v_dict))
+        return lista

@@ -19,20 +19,21 @@ def menu_principal():
         limpar_tela()
         exibir_cabecalho()
         print("\n[ CADASTRO E GESTÃO ]")
-        print("1. Cadastrar Pessoa (Proprietário)")
-        print("2. Gerenciar Veículo (Processar Lista do Evento)")
+        print("1. Cadastrar Pessoa")
+        print("2. Gerenciar Veículo (Autorizar)")
         
         print("\n[ OPERAÇÃO ]")
-        print("3. Consultar Acesso & Registrar Fluxo")
+        print("3. PORTARIA (Consulta & Fluxo)")
+        print("4. Veículos Presentes (Quem está dentro?)")
         
         print("\n[ RELATÓRIOS ]")
-        print("4. Ver Lista de Autorizados")
-        print("5. Ver Histórico de Registros")
+        print("5. Ver Lista de Autorizados")
+        print("6. Ver Histórico Completo")
+        print("7. Exportar Histórico para Excel (CSV)")
         
         print("\n[ MANUTENÇÃO ]")
-        print("9. ENCERRAR EVENTO (Resetar Permissões)")
+        print("9. ENCERRAR EVENTO (Reset)")
         print("0. Sair")
-        print("-" * 50)
         
         opcao = input("Escolha uma opção: ")
 
@@ -43,9 +44,14 @@ def menu_principal():
         elif opcao == '3':
             tela_consulta_acesso()
         elif opcao == '4':
-            tela_relatorio_autorizados()
+            tela_veiculos_dentro()
         elif opcao == '5':
+            tela_relatorio_autorizados()
+        elif opcao == '6':
             tela_relatorio_historico()
+        elif opcao == '7':
+            res = sistema.exportar_historico_csv()
+            input(f"\n>> {res['mensagem']}\nPressione Enter...")
         elif opcao == '9':
             tela_reset_evento()
         elif opcao == '0':
@@ -96,63 +102,64 @@ def tela_gestao_veiculo():
 def tela_consulta_acesso():
     while True:
         limpar_tela()
-        print("--- 3. PORTARIA (CONSULTA & REGISTRO) ---")
-        print("Digite 'sair' para voltar ao menu principal.\n")
+        print("--- 3. PORTARIA (CONSULTA & REGISTRO) ---\n")
+        busca = input("Digite a PLACA ou o CPF (ou 'sair'): ").strip()
+        if busca.lower() == 'sair': break
         
-        busca = input("Digite a PLACA ou o CPF: ").strip()
-
-        if busca.lower() == 'sair':
-            break
-        
-        if not busca:
-            continue
-
-        # Faz a consulta
         resultado = sistema.buscar_acesso(busca)
-
-        # Exibe o resultado
-        print("\n" + "*"*40)
-        if resultado['encontrado']:
-            status = "LIBERADO" if resultado['liberado'] else "BLOQUEADO / NÃO AUTORIZADO"
-            print(f"STATUS DO ACESSO: {status}")
-            print("-" * 40)
-            print(f"Detalhes: {resultado.get('detalhes', '')}")
-            
-            # --- O REGISTRO DO FLUXO ---
-            
-            # Só oferecemos opção de registrar se o resultado foi positivo (carro/pessoa existe)
-            print("-" * 40)
-            print("[AÇÕES]: [E] Registrar ENTRADA  |  [S] Registrar SAÍDA  |  [Enter] Nova Consulta")
-            acao = input("Opção: ").strip().upper()
-
-            if acao in ['E', 'S']:
-                tipo_movimento = 'ENTRADA' if acao == 'E' else 'SAIDA'
-                
-                # Se a busca original já era uma placa, usamos ela.
-                # Se foi CPF, precisamos perguntar qual placa está entrando.
-                from app.utils.validadores import ValidadorPlaca
-                
-                placa_para_registrar = ""
-                
-                if ValidadorPlaca.validar(busca):
-                    placa_para_registrar = busca
-                else:
-                    # Se buscou por CPF, o operador precisa confirmar qual carro é
-                    print(f"\n>> Atenção: Você pesquisou por CPF.")
-                    placa_para_registrar = input(">> Confirme a PLACA do veículo que está passando: ")
-
-                # Confirmação final
-                res_registro = sistema.registrar_fluxo(placa_para_registrar, tipo_movimento)
-                print(f"\n>> {res_registro['mensagem']}")
-                input("Pressione Enter para continuar...")
-
-        else:
-            print(f"ERRO: {resultado['mensagem']}")
-            print("Verifique se digitou corretamente ou realize o cadastro.")
-        print("*"*40)
+        print("\n" + "="*40)
         
-        if 'acao' not in locals() or acao not in ['E', 'S']:
-             input("\nPressione Enter para nova consulta...")
+        if resultado['encontrado']:
+            print(f"STATUS: {'[ LIBERADO ]' if resultado['liberado'] else '[ BLOQUEADO ]'}")
+            print(f"INFO: {resultado['mensagem']}")
+            print(f"DETALHES: {resultado['detalhes']}")
+            
+            placa_para_registro = None
+
+            # Se buscou por PLACA, já temos a placa
+            if 'placa_direta' in resultado:
+                placa_para_registro = resultado['placa_direta']
+            
+            # Se buscou por CPF, mostra os carros dele para o porteiro escolher um
+            elif 'lista_veiculos' in resultado:
+                print("\nVEÍCULOS DESTA PESSOA:")
+                for i, v in enumerate(resultado['lista_veiculos'], 1):
+                    auth = "OK" if v.get('autorizado') else "X"
+                    print(f"{i}. {v['placa']} - {v['modelo']} [{auth}]")
+                
+                escolha = input("\nSelecione o número do veículo (ou digite a placa): ")
+                if escolha.isdigit() and 1 <= int(escolha) <= len(resultado['lista_veiculos']):
+                    placa_para_registro = resultado['lista_veiculos'][int(escolha)-1]['placa']
+                else:
+                    placa_para_registro = escolha.upper()
+
+            if placa_para_registro:
+                print(f"\nREGISTRAR MOVIMENTO PARA: {placa_para_registro}")
+                acao = input("[E] Entrada | [S] Saída | [Enter] Cancelar: ").upper()
+                if acao in ['E', 'S']:
+                    tipo = 'ENTRADA' if acao == 'E' else 'SAIDA'
+                    res_reg = sistema.registrar_fluxo(placa_para_registro, tipo)
+                    print(f"\n>> {res_reg['mensagem']}")
+        else:
+            print(f"AVISO: {resultado['mensagem']}")
+        
+        print("="*40)
+        input("\nProxima consulta (Enter)...")
+
+def tela_veiculos_dentro():
+    limpar_tela()
+    print("--- VEÍCULOS ATUALMENTE NO PÁTIO ---")
+    lista = sistema.relatorio_veiculos_internos()
+    
+    if not lista:
+        print("\nO pátio está vazio.")
+    else:
+        print(f"{'PLACA':<10} | {'VEÍCULO':<20} | {'PROPRIETÁRIO'}")
+        print("-" * 50)
+        for item in lista:
+            print(f"{item['placa']:<10} | {item['modelo']:<20} | {item['dono']}")
+    
+    input("\nPressione Enter para voltar...")
 
 def tela_relatorio_autorizados():
     limpar_tela()

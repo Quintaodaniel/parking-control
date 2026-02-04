@@ -1,0 +1,54 @@
+{
+    "pessoas": [
+        {
+            "nome": "Daniel Quintão Féres",
+            "cpf": "18048103710",
+            "contato": "danielqferes@gmail.com"
+        },
+        {
+            "nome": "Gabriel Quintão Féres",
+            "cpf": "98174908749",
+            "contato": "gabrieltribol9@gmail.com"
+        }
+    ],
+    "veiculos": [
+        {
+            "placa": "HKR5E74",
+            "modelo": "Chevrolet Astra",
+            "cor": "Prata",
+            "proprietario_cpf": "18048103710",
+            "autorizado": true
+        },
+        {
+            "placa": "KJV3796",
+            "modelo": "Chevrolet Astra",
+            "cor": "Preto",
+            "proprietario_cpf": "98174908749",
+            "autorizado": true
+        },
+        {
+            "placa": "JNJ1863",
+            "modelo": "Chevrolet Spin",
+            "cor": "Amarelo",
+            "proprietario_cpf": "18048103710",
+            "autorizado": false
+        }
+    ],
+    "historico": [
+        {
+            "placa": "HKR5E74",
+            "tipo": "ENTRADA",
+            "data_hora": "2026-02-04 10:04:45"
+        },
+        {
+            "placa": "KJV3796",
+            "tipo": "ENTRADA",
+            "data_hora": "2026-02-04 10:16:47"
+        },
+        {
+            "placa": "HKR5E74",
+            "tipo": "SAIDA",
+            "data_hora": "2026-02-04 10:26:29"
+        }
+    ]
+}
